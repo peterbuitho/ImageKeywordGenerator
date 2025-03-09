@@ -12,3 +12,5 @@
 - Keywords are saved in json files for each language
 - Support embedding keywords to image file from the generated json
 - Embedding to only selected image files
+
+![Screenshot](images/Screenshot.jpg?raw=true)
