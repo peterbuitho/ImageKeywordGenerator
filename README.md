@@ -24,4 +24,5 @@
 ### ToDo's
 
 - Lookup from Ollama list of models instead
+- Add place name lookup from image GPS data if any
 - Maybe normalize Vietnamese embedding 
