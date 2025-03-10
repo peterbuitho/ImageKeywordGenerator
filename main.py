@@ -27,7 +27,7 @@ class ImageKeywordGenerator:
         }
         
         # Configure base URL based on model provider
-        if model_name.startswith('llava') or model_name.startswith('llama'):
+        if not model_name.startswith('gpt-4') and not model_name.startswith('gemini'):
             self.base_url = "http://localhost:11434/api/generate"
             self.provider = 'ollama'
         elif model_name.startswith('gpt-4'):
@@ -36,6 +36,10 @@ class ImageKeywordGenerator:
         elif model_name.startswith('gemini'):
             self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
             self.provider = 'google'
+        else:
+            # Default to Ollama for unknown models
+            self.base_url = "http://localhost:11434/api/generate"
+            self.provider = 'ollama'
 
     def get_headers(self):
         if self.provider == 'ollama':
@@ -231,26 +235,23 @@ class ImageKeywordGeneratorGUI:
         )
         api_button.grid(row=2, column=2, pady=5, padx=5, sticky=tk.E)
         
-        # Available models
-        self.models = [
-            "llava",
-            "llava:13b",
-            "llama3.2-vision",
-            "llava-llama3:8b-v1.1-fp16",
-            "llava-llama3:8b",
-            "gpt-4-vision-preview",
-            "gemini-pro-vision"
-        ]
+        # Initialize status_area first
+        self.status_area = ScrolledText(self.main_frame, height=5)
+        self.status_area.grid(row=7, column=0, columnspan=3, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Model radio buttons
-        self.model = tk.StringVar(value="llava")
-        for i, model_name in enumerate(self.models):
-            ttk.Radiobutton(
-                model_frame, 
-                text=model_name,
-                variable=self.model,
-                value=model_name
-            ).grid(row=i//3, column=i%3, padx=10, sticky=tk.W)
+        # Get available models
+        available_models = self.get_ollama_models()
+        
+        # Model combobox
+        self.model = ttk.Combobox(
+            model_frame,
+            values=available_models,
+            state='readonly',
+            width=40
+        )
+        if available_models:
+            self.model.set(available_models[0])
+        self.model.grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
         
         # Language selection frame
         lang_frame = ttk.LabelFrame(self.main_frame, text="Languages", padding="5")
@@ -329,12 +330,6 @@ class ImageKeywordGeneratorGUI:
         # Store processed keywords
         self.last_processed_keywords = {}
         self.last_processed_files = []
-
-        # Extended model list including API models
-        self.models.extend([
-            "gpt-4-vision-preview",
-            "gemini-pro-vision"
-        ])
 
         # Load configuration
         self.config_manager = ConfigManager()
@@ -508,6 +503,39 @@ class ImageKeywordGeneratorGUI:
             self.log("Processing complete!")
         except Exception as e:
             self.log(f"Error: {str(e)}")
+
+    def get_ollama_models(self):
+        """Retrieve list of available models from Ollama"""
+        try:
+            response = requests.get("http://localhost:11434/api/tags")
+            if response.status_code == 200:
+                models = []
+                data = response.json()
+                print("Ollama response:", data)  # Debug print
+                
+                # Get all installed models
+                if 'models' in data:
+                    for model in data['models']:
+                        model_name = model['name']
+                        details = model.get('details', {})
+                        
+                        # Check if model is vision-capable by looking at:
+                        # 1. Model name patterns
+                        # 2. Families in details that include 'clip'
+                        # 3. Known vision model names
+                        if (any(term in model_name.lower() for term in ['llava', 'vision', 'bakllava', 'moondream', 'granite']) or
+                            'clip' in details.get('families', [])):
+                            models.append(model_name)
+                
+                # Add API models
+                models.extend(["gpt-4-vision-preview", "gemini-pro-vision"])
+                
+                print("Found models:", models)  # Debug print
+                return sorted(models)  # Sort alphabetically for better display
+            return []
+        except Exception as e:
+            print(f"Error getting Ollama models: {str(e)}")
+            return []
 
 def main():
     parser = argparse.ArgumentParser(description='Generate keywords for images using LLM vision model')
