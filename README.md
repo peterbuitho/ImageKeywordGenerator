@@ -24,5 +24,6 @@
 ### ToDo's
 
 - Lookup from Ollama list of models instead
+- Added support for LM-Studio
 - Add place name lookup from image GPS data if any and vice versa
 - Maybe normalize Vietnamese embedding 
