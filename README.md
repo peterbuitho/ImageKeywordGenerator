@@ -8,7 +8,7 @@
 
 ### Features
 
-- Support selected local Ollama vision medels: Llava models, Llama3.2-vision, Llava-llama models
+- Support selected local Ollama vision models: Llava models, Llama3.2-vision, Llava-llama models
 - Keywords in 3 optional languages: English, Danish and Vietnamese
 - Keywords are saved in json files for each language
 - Support embedding keywords to image file from the generated json
