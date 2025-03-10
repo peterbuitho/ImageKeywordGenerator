@@ -9,7 +9,8 @@
 
 ### Features
 
-- Support selected local Ollama vision models: Llava models, Llama3.2-vision, Llava-llama models
+- Supported installed Ollama local vision LLM's
+- Option to use OpenAI or Google AI API
 - Keywords in 3 optional languages: English, Danish and Vietnamese
 - Keywords are saved in json files for each language
 - Support embedding keywords to image file from the generated json
@@ -24,7 +25,6 @@
 
 ### ToDo's
 
-- Lookup from Ollama list of models instead
 - Added support for LM-Studio
 - Add place name lookup from image GPS data if any and vice versa
 - Maybe normalize Vietnamese embedding 
