@@ -1,5 +1,6 @@
 # Keyword genrator for images
 ## Using Vision LLM
+### An experiment in vibe coding using VS Code for Insiders
 
 ### Requirements
 
