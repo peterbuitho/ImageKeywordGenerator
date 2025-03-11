@@ -43,17 +43,23 @@ class ImageKeywordGeneratorGUI:
         # Configure root window
         self.setup_window()
         
-        # Create main layout
-        self.create_main_frame()
+        # Create main frame
+        self.main_frame = ttk.Frame(self.root, padding="5")
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Create UI sections
-        self.create_directory_section()
-        self.create_model_section()
-        self.create_language_section()
-        self.create_options_section()
-        self.create_button_section()
-        self.create_results_section()
-        self.create_status_section()
+        # Configure main frame grid weights
+        self.main_frame.columnconfigure(1, weight=1)  # Middle column expands
+        self.main_frame.rowconfigure(6, weight=3)     # TreeView row expands more
+        self.main_frame.rowconfigure(8, weight=1)     # Status area row expands less
+        
+        # Create UI sections in correct order
+        self.create_directory_section()    # Row 0-1
+        self.create_model_section()        # Row 2
+        self.create_language_section()     # Row 3
+        self.create_options_section()      # Row 4
+        self.create_button_section()       # Row 5
+        self.create_results_section()      # Row 6-7
+        self.create_status_section()       # Row 8
         
         # Initialize other components
         self.initialize_components()
@@ -63,8 +69,8 @@ class ImageKeywordGeneratorGUI:
     
     def setup_window(self):
         """Configure the main window size and position"""
-        window_width = 2048
-        window_height = 1200
+        window_width = 1600
+        window_height = 900
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         center_x = int(screen_width/2 - window_width/2)
@@ -74,35 +80,26 @@ class ImageKeywordGeneratorGUI:
         self.root.rowconfigure(0, weight=1)
         self.root.columnconfigure(0, weight=1)
     
-    def create_main_frame(self):
-        """Create and configure the main frame"""
-        self.main_frame = ttk.Frame(self.root, padding="5")
-        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # Configure grid weights
-        for i in range(3):  # Columns
-            self.main_frame.columnconfigure(i, weight=1)
-        for i in range(9):  # Rows
-            weight = 3 if i == 6 else 1  # Row 6 (Treeview) gets more weight
-            self.main_frame.rowconfigure(i, weight=weight)
-    
     def create_status_section(self):
-        """Create the status area"""
+        """Create the status/log area"""
+        # Create a labeled frame for the status area
+        status_frame = ttk.LabelFrame(self.main_frame, text="Process Log", padding="5")
+        status_frame.grid(row=8, column=0, columnspan=3, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure grid weights for status frame
+        status_frame.columnconfigure(0, weight=1)
+        status_frame.rowconfigure(0, weight=1)
+        
+        # Create scrolled text widget for status messages
         self.status_area = ScrolledText(
-            self.main_frame, 
-            height=10, 
+            status_frame,
+            height=8,
             wrap=tk.WORD,
             background='white',
             font=('Consolas', 9)
         )
-        self.status_area.grid(
-            row=8, 
-            column=0, 
-            columnspan=3, 
-            pady=5, 
-            sticky=(tk.W, tk.E, tk.N, tk.S)
-        )
-    
+        self.status_area.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
     def log(self, message: str):
         """Add message to status area with timestamp"""
         if hasattr(self, 'status_area'):
@@ -490,40 +487,54 @@ class ImageKeywordGeneratorGUI:
 
     def create_results_section(self):
         """Create the results treeview section"""
-        # Create treeview with scrollbar
+        # Create treeview with scrollbars
         tree_frame = ttk.Frame(self.main_frame)
         tree_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Create scrollbar
-        scrollbar = ttk.Scrollbar(tree_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Configure grid weights for tree_frame
+        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.rowconfigure(0, weight=1)
+
+        # Configure style for fixed row height
+        style = ttk.Style()
+        style.configure('Treeview', rowheight=75)
         
         # Create treeview
+        columns = ('filename', 'english', 'danish', 'vietnamese')
         self.log_tree = ttk.Treeview(
-            tree_frame,
-            columns=('File', 'English', 'Danish', 'Vietnamese'),
-            selectmode='extended'
+            tree_frame,  # Changed parent to tree_frame
+            columns=columns,
+            show='tree headings',
+            height=20,
+            selectmode='extended',
+            style="Treeview"
         )
+        
+        # Create scrollbars
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.log_tree.yview)
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.log_tree.xview)
+        
+        # Configure treeview scrolling
+        self.log_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        
+        # Grid layout for treeview and scrollbars
+        self.log_tree.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
+        vsb.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        hsb.grid(row=1, column=0, sticky=(tk.E, tk.W))
         
         # Configure columns
         self.log_tree.column('#0', width=100)  # Icon column
-        self.log_tree.column('File', width=200)
-        self.log_tree.column('English', width=300)
-        self.log_tree.column('Danish', width=300)
-        self.log_tree.column('Vietnamese', width=300)
+        self.log_tree.column('filename', width=200)
+        self.log_tree.column('english', width=300)
+        self.log_tree.column('danish', width=300)
+        self.log_tree.column('vietnamese', width=300)
         
         # Configure headers
-        self.log_tree.heading('File', text='File')
-        self.log_tree.heading('English', text='English Keywords')
-        self.log_tree.heading('Danish', text='Danish Keywords')
-        self.log_tree.heading('Vietnamese', text='Vietnamese Keywords')
-        
-        # Configure scrollbar
-        self.log_tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.configure(command=self.log_tree.yview)
-        
-        # Pack treeview
-        self.log_tree.pack(expand=True, fill=tk.BOTH)
+        self.log_tree.heading('#0', text='Preview')
+        self.log_tree.heading('filename', text='File')
+        self.log_tree.heading('english', text='English Keywords')
+        self.log_tree.heading('danish', text='Danish Keywords')
+        self.log_tree.heading('vietnamese', text='Vietnamese Keywords')
         
         # Initialize storage for thumbnails and file mappings
         self.thumbnail_cache = {}
