@@ -7,7 +7,9 @@
 - Local LLM's running in Ollama
 - OpenAI or Google API
 
-### Features
+### Release 0.1.0
+
+#### Features
 
 - Supported installed Ollama local vision LLM's
 - Option to use OpenAI or Google AI API
@@ -18,12 +20,12 @@
 
 ![Screenshot](images/Screenshot.jpg?raw=true)
 
-### Known issues
+#### Known issues
 
 - Vietnamese embedding looks wrong. Probably codepage error.
 - Response from LLM's don't always have the correct format 
 
-### ToDo's
+#### ToDo's
 
 - Added support for LM-Studio
 - Add place name lookup from image GPS data if any and vice versa

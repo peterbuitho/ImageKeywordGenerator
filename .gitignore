@@ -4,4 +4,10 @@ dist/BuiImageKeywordGenerator.exe
 __pycache__/config_manager.cpython-313.pyc
 __pycache__/config_manager.cpython-313.pyc
 __pycache__/config_manager.cpython-313.pyc
-src/gui/__pycache__/main_window.cpython-313.pyc
+src/__pycache__/__init__.cpython-312.pyc
+src/gui/__pycache__/__init__.cpython-312.pyc
+src/gui/__pycache__/main_window.cpython-312.pyc
+src/models/__pycache__/generator.cpython-312.pyc
+src/utils/__pycache__/__init__.cpython-312.pyc
+src/utils/__pycache__/config_manager.cpython-312.pyc
+src/utils/__pycache__/metadata.cpython-312.pyc
