@@ -13,6 +13,7 @@ import requests
 from ..utils.metadata import save_keywords, embed_keywords_in_image
 from ..models.generator import ImageKeywordGenerator
 from ..utils.config_manager import ConfigManager
+import tkinter.font as tkFont
 
 class ImageKeywordGeneratorGUI:
     def wrap_text(self, text, width=40):
@@ -49,8 +50,9 @@ class ImageKeywordGeneratorGUI:
         
         # Configure main frame grid weights
         self.main_frame.columnconfigure(1, weight=1)  # Middle column expands
-        self.main_frame.rowconfigure(6, weight=3)     # TreeView row expands more
-        self.main_frame.rowconfigure(8, weight=1)     # Status area row expands less
+        self.main_frame.rowconfigure(6, weight=2)     # TreeView row expands more
+        self.main_frame.rowconfigure(8, weight=1, minsize=150)  # Increased minimum height for status
+        
         
         # Create UI sections in correct order
         self.create_directory_section()    # Row 0-1
@@ -76,29 +78,46 @@ class ImageKeywordGeneratorGUI:
         center_x = int(screen_width/2 - window_width/2)
         center_y = int(screen_height/2 - window_height/2)
         self.root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')
+        self.root.minsize(800, 700)  # Prevent window from being too small
         self.root.resizable(True, True)
         self.root.rowconfigure(0, weight=1)
         self.root.columnconfigure(0, weight=1)
     
     def create_status_section(self):
         """Create the status/log area"""
-        # Create a labeled frame for the status area
-        status_frame = ttk.LabelFrame(self.main_frame, text="Process Log", padding="5")
-        status_frame.grid(row=8, column=0, columnspan=3, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # Create a labeled frame for the status area with toggle button
+        self.status_frame = ttk.LabelFrame(self.main_frame, padding="5")
+        self.status_frame.grid(row=8, column=0, columnspan=3, padx=5, pady=(5,0), sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Create custom label widget with toggle button
+        label_frame = ttk.Frame(self.status_frame)
+        ttk.Label(label_frame, text="Process Log").pack(side=tk.LEFT, padx=5)
+        self.toggle_status_button = ttk.Button(label_frame, text="Hide", command=self.toggle_status_visibility, width=5)
+        self.toggle_status_button.pack(side=tk.RIGHT, padx=5)
+        self.status_frame['labelwidget'] = label_frame
         
         # Configure grid weights for status frame
-        status_frame.columnconfigure(0, weight=1)
-        status_frame.rowconfigure(0, weight=1)
+        self.status_frame.columnconfigure(0, weight=1)
+        self.status_frame.rowconfigure(0, weight=1)
         
         # Create scrolled text widget for status messages
         self.status_area = ScrolledText(
-            status_frame,
-            height=8,
+            self.status_frame,
+            height=12,
             wrap=tk.WORD,
             background='white',
             font=('Consolas', 9)
         )
         self.status_area.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+    def toggle_status_visibility(self):
+        """Toggle visibility of the status area"""
+        if self.status_area.winfo_ismapped():
+            self.status_area.grid_remove()
+            self.toggle_status_button.config(text="Show")
+        else:
+            self.status_area.grid()
+            self.toggle_status_button.config(text="Hide")
 
     def log(self, message: str):
         """Add message to status area with timestamp"""
@@ -218,23 +237,28 @@ class ImageKeywordGeneratorGUI:
                 aspect_ratio = img.width / img.height
                 if (aspect_ratio > 1):
                     # Landscape image
-                    target_width = 75
+                    target_width = 50
                     target_height = int(target_width / aspect_ratio)
                 else:
                     # Portrait image   
-                    target_height = 75
+                    target_height = 50
                     target_width = int(target_height * aspect_ratio)
                 
                 img_resized = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(img_resized)
                 self.thumbnail_cache[file_path] = photo
             
+           # Get column widths
+            english_width = self.log_tree.column('english', 'width')
+            danish_width = self.log_tree.column('danish', 'width')
+            vietnamese_width = self.log_tree.column('vietnamese', 'width')
+            
             # Prepare values with wrapped text
             values = [
                 Path(file_path).name,  # filename
-                self.wrap_text(', '.join(keywords.get('en', [])), 30),  # english keywords
-                self.wrap_text(', '.join(keywords.get('dk', [])), 30),  # danish keywords
-                self.wrap_text(', '.join(keywords.get('vi', [])), 30)   # vietnamese keywords
+                self.wrap_text(', '.join(keywords.get('en', [])), english_width // 8),  # english keywords
+                self.wrap_text(', '.join(keywords.get('dk', [])), danish_width // 8),  # danish keywords
+                self.wrap_text(', '.join(keywords.get('vi', [])), vietnamese_width // 8)   # vietnamese keywords
             ]
             
             # Insert into tree with thumbnail in the icon column (#0)
@@ -326,7 +350,7 @@ class ImageKeywordGeneratorGUI:
             self.last_processed_files = set()
             
             # Process images
-            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
+            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
             found_files = False
             
             for file_path in Path(input_dir).rglob('*'):
@@ -471,19 +495,32 @@ class ImageKeywordGeneratorGUI:
     def create_button_section(self):
         """Create the main action buttons section"""
         button_frame = ttk.Frame(self.main_frame)
-        button_frame.grid(row=4, column=0, columnspan=3, pady=10)
+        button_frame.grid(row=5, column=0, columnspan=3, pady=10)
         
-        ttk.Button(
+        # Process Images button
+        process_button = ttk.Button(
             button_frame,
             text="Process Images",
             command=self.process_images
-        ).grid(row=0, column=0, padx=5)
+        )
+        process_button.grid(row=0, column=0, padx=5)
         
-        ttk.Button(
+        # Embed Keywords button
+        embed_button = ttk.Button(
             button_frame,
             text="Embed Keywords",
             command=self.embed_keywords
-        ).grid(row=0, column=1, padx=5)
+        )
+        embed_button.grid(row=0, column=1, padx=5)
+        
+        # Highlight buttons
+        process_button.configure(style='Highlight.TButton')
+        embed_button.configure(style='Highlight.TButton')
+
+        # Add style configuration for highlighted buttons
+        style = ttk.Style()
+        bold_font = tkFont.Font(weight='bold')
+        style.configure('Highlight.TButton', font=bold_font)
 
     def create_results_section(self):
         """Create the results treeview section"""

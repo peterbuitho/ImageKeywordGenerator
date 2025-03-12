@@ -45,20 +45,30 @@ def main():
             parser.error("--input_dir is required when not using GUI mode")
         if not args.output_dir:
             parser.error("--output_dir is required when not using GUI mode")
-            
+    
+        input_path = Path(args.input_dir)
+           
+        if not input_path.exists():
+            parser.error(f"Input directory does not exist: {args.input_dir}")
+    
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+        image_files = [file_path for file_path in input_path.rglob('*') if file_path.suffix.lower() in image_extensions]
+        
+        if not image_files:
+            print("No image files found in the input directory.")
+            sys.exit()
+
         # Original CLI code
         os.makedirs(args.output_dir, exist_ok=True)
         generator = ImageKeywordGenerator(model_name=args.model)
-        
-        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
-        for file_path in Path(args.input_dir).rglob('*'):
-            if file_path.suffix.lower() in image_extensions:
-                print(f"Processing: {file_path}")
-                keywords = generator.generate_keywords(str(file_path), args.languages)
-                if keywords:
-                    save_keywords(str(file_path), keywords, args.output_dir, append=args.append)
-                    for lang in args.languages:
-                        print(f"Generated keywords ({lang}): {', '.join(keywords[lang])}")
+
+        for file_path in image_files:
+            print(f"Processing: {file_path}")
+            keywords = generator.generate_keywords(str(file_path), args.languages)
+            if keywords:
+                save_keywords(str(file_path), keywords, args.output_dir, append=args.append)
+                for lang in args.languages:
+                    print(f"Generated keywords ({lang}): {', '.join(keywords[lang])}")
 
 if __name__ == "__main__":
     main()
