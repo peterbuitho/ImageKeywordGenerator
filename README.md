@@ -4,7 +4,7 @@
 
 ### Requirements
 
-- Local LLM's running in Ollama
+- Local LLM's with Ollama and/or LM Studio 
 - OpenAI or Google API
 
 ### Release 0.3.1
