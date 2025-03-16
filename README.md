@@ -9,16 +9,16 @@
 
 
 ## Releases
-### Release 0.3.1
+### 0.3.1
 
 - Fixed webp support
 - Improved UI functionalities and responsiveness
 
-### Release 0.3.0
+### 0.3.0
 
 - Added support for LM-Studio
 
-### Release 0.2.0
+### 0.2.0
 
 - Installed Ollama vision LLM models can now be selected in a dropdown list
 - Added image thumbnail display
@@ -26,7 +26,7 @@
 - Cosmetic changes to main window
 - Bugfixes
 
-### Release 0.1.0
+### 0.1.0
 
 #### Features
 
