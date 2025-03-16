@@ -30,3 +30,5 @@ build/BuiImageKeywordGenerator/localpycs/pyimod02_importers.pyc
 build/BuiImageKeywordGenerator/localpycs/pyimod03_ctypes.pyc
 build/BuiImageKeywordGenerator/localpycs/pyimod04_pywin32.pyc
 build/BuiImageKeywordGenerator/localpycs/struct.pyc
+src/models/__pycache__/generator.cpython-313.pyc
+src/gui/__pycache__/main_window.cpython-313.pyc

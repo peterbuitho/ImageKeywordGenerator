@@ -1,6 +1,8 @@
 import tkinter as tk
 import base64
 import os
+import threading
+import queue
 from tkinter import ttk, filedialog, messagebox
 from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageTk
@@ -50,9 +52,7 @@ class ImageKeywordGeneratorGUI:
         
         # Configure main frame grid weights
         self.main_frame.columnconfigure(1, weight=1)  # Middle column expands
-        self.main_frame.rowconfigure(6, weight=2)     # TreeView row expands more
-        self.main_frame.rowconfigure(8, weight=1, minsize=150)  # Increased minimum height for status
-        
+        self.main_frame.rowconfigure(6, weight=1)     # TreeView row expands more
         
         # Create UI sections in correct order
         self.create_directory_section()    # Row 0-1
@@ -60,19 +60,36 @@ class ImageKeywordGeneratorGUI:
         self.create_language_section()     # Row 3
         self.create_options_section()      # Row 4
         self.create_button_section()       # Row 5
-        self.create_results_section()      # Row 6-7
-        self.create_status_section()       # Row 8
+        
+        # Create a paned window to hold results and status sections
+        self.paned_window = ttk.PanedWindow(self.main_frame, orient=tk.VERTICAL)
+        self.paned_window.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame.rowconfigure(6, weight=1)  # Make the paned window take all remaining space
+        
+        # Customize the sash appearance to make it more visible
+        style = ttk.Style()
+        style.configure('TPanedwindow', background='#aaaaaa')
+        style.map('TPanedwindow', background=[('active', '#999999')])
+        style.configure('Sash', sashthickness=6, sashrelief='raised')
+        
+        # Create both sections within the paned window
+        self.create_results_section()  
+        self.create_status_section()   
         
         # Initialize other components
         self.initialize_components()
         
         # Log initialization
         self.log("Application initialized successfully")
+        
+        # Set the sash position to show approximately 5 lines of log
+        # Schedule this after initialization to ensure proper sizing
+        self.root.after(100, self.set_initial_sash_position)
     
     def setup_window(self):
         """Configure the main window size and position"""
         window_width = 1600
-        window_height = 900
+        window_height = 1200
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         center_x = int(screen_width/2 - window_width/2)
@@ -85,9 +102,17 @@ class ImageKeywordGeneratorGUI:
     
     def create_status_section(self):
         """Create the status/log area"""
+        # Create container frame for the status section
+        status_container = ttk.Frame(self.paned_window)
+        self.paned_window.add(status_container, weight=1)
+        
+        # Configure grid weights for the container
+        status_container.columnconfigure(0, weight=1)
+        status_container.rowconfigure(0, weight=1)
+        
         # Create a labeled frame for the status area with toggle button
-        self.status_frame = ttk.LabelFrame(self.main_frame, padding="5")
-        self.status_frame.grid(row=8, column=0, columnspan=3, padx=5, pady=(5,0), sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.status_frame = ttk.LabelFrame(status_container, padding="5")
+        self.status_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Create custom label widget with toggle button
         label_frame = ttk.Frame(self.status_frame)
@@ -103,7 +128,7 @@ class ImageKeywordGeneratorGUI:
         # Create scrolled text widget for status messages
         self.status_area = ScrolledText(
             self.status_frame,
-            height=12,
+            height=5,  # Set to 5 lines by default
             wrap=tk.WORD,
             background='white',
             font=('Consolas', 9)
@@ -351,30 +376,174 @@ class ImageKeywordGeneratorGUI:
             
             # Process images
             image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
-            found_files = False
             
+            # Find all image files first
+            image_files = []
             for file_path in Path(input_dir).rglob('*'):
                 if file_path.suffix.lower() in image_extensions:
-                    found_files = True
-                    self.log(f"Processing: {file_path}")
-                    try:
-                        keywords = self.generator.generate_keywords(str(file_path), selected_langs)
-                        if keywords:
-                            self.last_processed_keywords[str(file_path)] = keywords
-                            self.last_processed_files.add(str(file_path))
-                            self.add_result_to_tree(str(file_path), keywords)
-                            save_keywords(str(file_path), keywords, output_dir, self.append_mode.get())
-                            for lang in selected_langs:
-                                self.log(f"Generated keywords ({lang}): {', '.join(keywords[lang])}")
-                    except Exception as e:
-                        self.log(f"Error processing {file_path}: {str(e)}")
+                    image_files.append(str(file_path))
             
-            if not found_files:
+            if not image_files:
                 self.log("No image files found in the selected directory")
+                return
                 
+            self.log(f"Found {len(image_files)} images to process")
+            
+            # Create a processing queue and result queue
+            self.processing_queue = queue.Queue()
+            self.result_queue = queue.Queue()
+            
+            # Add all files to the queue
+            for file_path in image_files:
+                self.processing_queue.put(file_path)
+            
+            # Disable the process button during processing
+            process_button = [btn for btn in self.main_frame.winfo_children() 
+                             if isinstance(btn, ttk.Frame) and 
+                             any(isinstance(child, ttk.Button) and child['text'] == "Process Images" 
+                                 for child in btn.winfo_children())]
+            
+            if process_button:
+                for child in process_button[0].winfo_children():
+                    if isinstance(child, ttk.Button) and child['text'] == "Process Images":
+                        self.process_button = child
+                        self.process_button_text = child['text']
+                        child.configure(text="Processing... (0%)", state='disabled')
+            
+            # Start the worker threads
+            self.processing_active = True
+            self.total_images = len(image_files)
+            self.processed_count = 0
+            
+            # Number of worker threads (adjust based on your needs)
+            num_threads = min(3, len(image_files))  # Limit to max 3 threads
+            
+            # Start worker threads
+            self.worker_threads = []
+            for i in range(num_threads):
+                thread = threading.Thread(target=self._process_image_worker, 
+                                         args=(selected_langs, output_dir),
+                                         daemon=True)
+                thread.start()
+                self.worker_threads.append(thread)
+            
+            # Start a thread to monitor the result queue and update the UI
+            self.update_thread = threading.Thread(target=self._update_ui_from_queue, daemon=True)
+            self.update_thread.start()
+            
+            # Schedule periodic UI updates to maintain responsiveness
+            self.root.after(100, self._check_processing_complete)
+            
         except Exception as e:
             self.log(f"Error during processing: {str(e)}")
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
+    
+    def _process_image_worker(self, selected_langs, output_dir):
+        """Worker thread to process images from the queue"""
+        while self.processing_active:
+            try:
+                # Get a file from the queue, with a timeout to allow checking processing_active
+                try:
+                    file_path = self.processing_queue.get(timeout=0.5)
+                except queue.Empty:
+                    # No more files to process
+                    break
+                
+                # Process the image
+                try:
+                    keywords = self.generator.generate_keywords(file_path, selected_langs)
+                    if keywords:
+                        # Put the result in the result queue
+                        self.result_queue.put((file_path, keywords, True))
+                        
+                        # Save keywords to file
+                        save_keywords(file_path, keywords, output_dir, self.append_mode.get())
+                    else:
+                        self.result_queue.put((file_path, None, False))
+                except Exception as e:
+                    # Put the error in the result queue
+                    self.result_queue.put((file_path, str(e), False))
+                
+                # Mark task as done
+                self.processing_queue.task_done()
+                
+            except Exception as e:
+                # Log any unhandled exceptions
+                self.result_queue.put((None, f"Worker error: {str(e)}", False))
+    
+    def _update_ui_from_queue(self):
+        """Thread to update the UI with results from the queue"""
+        while self.processing_active or not self.result_queue.empty():
+            try:
+                # Get a result from the queue, with a timeout
+                try:
+                    file_path, result, success = self.result_queue.get(timeout=0.5)
+                except queue.Empty:
+                    # No results yet, try again
+                    continue
+                
+                # Update the UI in the main thread
+                if file_path:
+                    if success:
+                        # Success case - keywords generated
+                        keywords = result
+                        self.root.after(0, lambda: self._update_ui_with_result(file_path, keywords))
+                    else:
+                        # Error case
+                        error_msg = result if isinstance(result, str) else "Unknown error"
+                        self.root.after(0, lambda msg=error_msg, path=file_path: 
+                                      self.log(f"Error processing {path}: {msg}"))
+                else:
+                    # General error
+                    self.root.after(0, lambda msg=result: self.log(msg))
+                
+                # Mark as processed and update progress
+                self.processed_count += 1
+                progress = int((self.processed_count / self.total_images) * 100)
+                
+                # Update progress indicator
+                if hasattr(self, 'process_button'):
+                    self.root.after(0, lambda p=progress: 
+                                  self.process_button.configure(
+                                      text=f"Processing... ({p}%)"))
+                
+                # Mark task as done
+                self.result_queue.task_done()
+                
+            except Exception as e:
+                # Log any unhandled exceptions
+                print(f"UI update error: {str(e)}")
+    
+    def _update_ui_with_result(self, file_path, keywords):
+        """Update the UI with a successful result"""
+        # Store the result
+        self.last_processed_keywords[file_path] = keywords
+        self.last_processed_files.add(file_path)
+        
+        # Add to treeview
+        self.add_result_to_tree(file_path, keywords)
+        
+        # Log the keywords
+        for lang in keywords.keys():
+            self.log(f"Generated keywords ({lang}): {', '.join(keywords[lang])}")
+    
+    def _check_processing_complete(self):
+        """Check if all processing is complete and update UI accordingly"""
+        if not hasattr(self, 'processing_active') or not self.processing_active:
+            return
+        
+        # If the queue is empty and all threads are done
+        if self.processing_queue.empty() and self.processed_count >= self.total_images:
+            # Re-enable the process button
+            if hasattr(self, 'process_button'):
+                self.process_button.configure(text=self.process_button_text, state='normal')
+            
+            self.log("All images processed successfully")
+            self.processing_active = False
+            return
+        
+        # Schedule the next check
+        self.root.after(500, self._check_processing_complete)
 
     def get_lm_studio_models(self):
         """Get list of available models from LM-studio server"""
@@ -549,9 +718,17 @@ class ImageKeywordGeneratorGUI:
 
     def create_results_section(self):
         """Create the results treeview section"""
+        # Create container frame for the results section
+        results_container = ttk.Frame(self.paned_window)
+        self.paned_window.add(results_container, weight=2)
+        
+        # Configure grid weights for the container
+        results_container.columnconfigure(0, weight=1)
+        results_container.rowconfigure(0, weight=1)
+        
         # Create treeview with scrollbars
-        tree_frame = ttk.Frame(self.main_frame)
-        tree_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S))
+        tree_frame = ttk.Frame(results_container)
+        tree_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights for tree_frame
         tree_frame.columnconfigure(0, weight=1)
@@ -564,7 +741,7 @@ class ImageKeywordGeneratorGUI:
         # Create treeview
         columns = ('filename', 'english', 'danish', 'vietnamese')
         self.log_tree = ttk.Treeview(
-            tree_frame,  # Changed parent to tree_frame
+            tree_frame,
             columns=columns,
             show='tree headings',
             height=20,
@@ -606,3 +783,11 @@ class ImageKeywordGeneratorGUI:
         """Initialize additional components"""
         self.config_manager = ConfigManager()
         self.generator = None  # Will be set when model is selected
+
+    def set_initial_sash_position(self):
+        """Set the initial position of the sash to show 5 lines of log"""
+        total_height = self.paned_window.winfo_height()
+        # Set sash to show approximately 5 lines (each line is ~20px high)
+        log_height = 125  # Approximate height for 5 lines of log plus padding
+        if total_height > log_height * 2:  # Make sure we have enough height
+            self.paned_window.sashpos(0, total_height - log_height)

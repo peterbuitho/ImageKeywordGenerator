@@ -52,8 +52,27 @@ class ImageKeywordGenerator:
         """Generate keywords for an image in selected languages using selected model"""
         try:
             # Read and encode image
-            with open(image_path, 'rb') as img_file:
-                img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
+            image_path_obj = Path(image_path)
+            img_base64 = None
+            
+            # Check if image is WebP and convert if needed
+            if image_path_obj.suffix.lower() == '.webp':
+                # Open the WebP image and convert to JPEG
+                with Image.open(image_path) as img:
+                    # Create a BytesIO object to temporarily store the converted image
+                    buffer = BytesIO()
+                    # Convert to RGB mode if not already (in case of RGBA WebP)
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    # Save as JPEG to the buffer
+                    img.save(buffer, format='JPEG', quality=95)
+                    buffer.seek(0)
+                    # Encode the JPEG image
+                    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            else:
+                # Process non-WebP images as before
+                with open(image_path, 'rb') as img_file:
+                    img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
 
             # Initialize keywords dict only for selected languages
             keywords = {lang: [] for lang in languages}
