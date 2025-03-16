@@ -7,7 +7,12 @@
 - Local LLM's running in Ollama
 - OpenAI or Google API
 
-### Release 0.2.1
+### Release 0.3.1
+
+- Fixed webp support
+- Improved UI functionalities and responsiveness
+
+### Release 0.3.0
 
 - Added support for LM-Studio
 
