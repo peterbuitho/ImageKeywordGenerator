@@ -7,6 +7,10 @@
 - Local LLM's running in Ollama
 - OpenAI or Google API
 
+### Release 0.2.1
+
+- Added support for LM-Studio
+
 ### Release 0.2.0
 
 - Installed Ollama vision LLM models can now be selected in a dropdown list
