@@ -35,8 +35,6 @@
 - Support embedding keywords to image file from the generated json
 - Embedding to only selected image files
 
-![Screenshot](images/Screenshot.jpg?raw=true)
-
 #### Known issues
 
 - Vietnamese embedding looks wrong. Probably codepage error.
@@ -44,6 +42,5 @@
 
 #### ToDo's
 
-- Added support for LM-Studio
 - Add place name lookup from image GPS data if any and vice versa
-- Maybe normalize Vietnamese embedding 
+- Improvement the image embbeding of Vietnamese
