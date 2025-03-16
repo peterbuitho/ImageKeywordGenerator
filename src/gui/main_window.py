@@ -376,6 +376,24 @@ class ImageKeywordGeneratorGUI:
             self.log(f"Error during processing: {str(e)}")
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
+    def get_lm_studio_models(self):
+        """Get list of available models from LM-studio server"""
+        try:
+            # Get LM-studio models
+            response = requests.get('http://localhost:1234/v1/models')
+            if response.status_code == 200:
+                data = response.json()
+                # Extract model names
+                lm_studio_models = [model['id'] for model in data['data']]
+            else:
+                lm_studio_models = []
+                self.log("Failed to get LM-studio models")
+        except Exception as e:
+            lm_studio_models = []
+            self.log(f"Error getting LM-studio models: {str(e)}")
+            
+        return lm_studio_models
+
     def get_ollama_models(self):
         """Get list of available models and update combobox"""
         try:
@@ -395,8 +413,15 @@ class ImageKeywordGeneratorGUI:
             ollama_models = []
             self.log(f"Error getting Ollama models: {str(e)}")
 
+        # Get LM-studio models
+        lm_studio_models = self.get_lm_studio_models()
+        if lm_studio_models:
+            # Add 'lmstudio:' prefix to differentiate from Ollama models
+            lm_studio_models = [f"lmstudio:{model}" for model in lm_studio_models]
+            self.log(f"Found {len(lm_studio_models)} LM-studio models")
+
         # Add cloud vision models
-        all_models = ollama_models + ['gpt-4-vision-preview', 'gemini-pro-vision']
+        all_models = ollama_models + lm_studio_models + ['gpt-4-vision-preview', 'gemini-pro-vision']
         
         # Update model combobox if it exists
         if hasattr(self, 'model') and self.model:
