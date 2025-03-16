@@ -2,11 +2,13 @@
 ## Using Vision LLM
 ### An experiment in vibe coding using VS Code for Insiders
 
-### Requirements
+## Requirements
 
 - Local LLM's with Ollama and/or LM Studio 
 - OpenAI or Google API
 
+
+## Releases
 ### Release 0.3.1
 
 - Fixed webp support
